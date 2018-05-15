@@ -4,7 +4,9 @@
   "description": "Dahua HTTP API Module",
   "main": "dahua.js",
   "dependencies": {
-    "net-keepalive": "^0.3.3"
+    "path": "^0.12.7",
+    "keypather": "^3.0.0",
+    "request": "^2.85.0"
   },
   "devDependencies": {},
   "scripts": {
