@@ -1,6 +1,6 @@
 {
   "name": "node-dahua-api",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Dahua HTTP API Module",
   "main": "dahua.js",
   "dependencies": {
