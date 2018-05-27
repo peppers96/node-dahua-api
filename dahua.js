@@ -118,7 +118,7 @@ dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
     self.emit("error",'INVALID PTZ COMMAND');
     return 0;
   }
-  request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + ptzcommand + '&arg1=' + arg1 + '&arg2=' + arg2 + '&arg3=' + arg3 + '&arg4=' + arg4, function (error, response, body) {
+  request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + cmd + '&arg1=' + arg1 + '&arg2=' + arg2 + '&arg3=' + arg3 + '&arg4=' + arg4, function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ COMMAND');
     }
