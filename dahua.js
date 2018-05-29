@@ -13,7 +13,11 @@ var path = require('path');
 var moment = require('moment');
 
 var TRACE   = true;
-var BASEURI   = false;
+// defining these so they aren't global
+this.BASEURI   = false;
+this.USER = '';
+this.PASS = '';
+this.HOST = '';
 
 var dahua = function(options) {
   
@@ -21,10 +25,11 @@ var dahua = function(options) {
   
   TRACE = options.log;
   
-  BASEURI = 'http://'+ options.host + ':' + options.port;
-  USER = options.user;
-  PASS = options.pass;
-  HOST = options.host;
+  this.BASEURI = 'http://'+ options.host + ':' + options.port;
+  this.USER = options.user;
+  this.PASS = options.pass;
+  this.HOST = options.host;
+  this.PORT = options.port;
 
   if( options.cameraAlarms === undefined ) {
     options.cameraAlarms = true;
@@ -46,12 +51,12 @@ dahua.prototype.connect = function(options) {
     var self = this;
 
     var opts = { 
-      'url' : BASEURI + '/cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss,VideoBlind]',
+      'url' : this.BASEURI + '/cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss,VideoBlind]',
       'forever' : true,
       'headers': {'Accept':'multipart/x-mixed-replace'}
     };
 
-    var client = request(opts).auth(USER,PASS,false);
+    var client = request(opts).auth(this.USER,this.PASS,false);
 
     client.on('socket', function(socket) {
       // Set keep-alive probes - throws ESOCKETTIMEDOUT error after ~16min if connection broken
@@ -125,21 +130,21 @@ dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
     self.emit("error",'INVALID PTZ COMMAND');
     return 0;
   }
-  request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + cmd + '&arg1=' + arg1 + '&arg2=' + arg2 + '&arg3=' + arg3 + '&arg4=' + arg4, function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + cmd + '&arg1=' + arg1 + '&arg2=' + arg2 + '&arg3=' + arg3 + '&arg4=' + arg4, function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ COMMAND');
     }
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 dahua.prototype.ptzPreset = function (preset) {
   var self = this;
   if (isNaN(preset))  self.emit("error",'INVALID PTZ PRESET');
-  request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=GotoPreset&arg1=0&arg2=' + preset + '&arg3=0', function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=GotoPreset&arg1=0&arg2=' + preset + '&arg3=0', function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ PRESET');
     }
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 dahua.prototype.ptzZoom = function (multiple) {
@@ -149,11 +154,11 @@ dahua.prototype.ptzZoom = function (multiple) {
   if (multiple < 0) cmd = 'ZoomWide';
   if (multiple === 0) return 0;
 
-  request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + cmd + '&arg1=0&arg2=' + multiple + '&arg3=0', function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + cmd + '&arg1=0&arg2=' + multiple + '&arg3=0', function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ ZOOM');
     }
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 dahua.prototype.ptzMove = function (direction,action,speed) {
@@ -168,57 +173,57 @@ dahua.prototype.ptzMove = function (direction,action,speed) {
     self.emit("error",'INVALID PTZ DIRECTION');
     return 0;
   }
-  request(BASEURI + '/cgi-bin/ptz.cgi?action=' + action + '&channel=0&code=' + direction + '&arg1=' + speed +'&arg2=' + speed + '&arg3=0', function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/ptz.cgi?action=' + action + '&channel=0&code=' + direction + '&arg1=' + speed +'&arg2=' + speed + '&arg3=0', function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ UP COMMAND');
     }
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 dahua.prototype.ptzStatus = function () {
   var self = this;
-  request(BASEURI + '/cgi-bin/ptz.cgi?action=getStatus', function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/ptz.cgi?action=getStatus', function (error, response, body) {
     if ((!error) && (response.statusCode === 200)) {
       body = body.toString().split('\r\n');
       self.emit("ptzStatus", body);
     } else {
       self.emit("error", 'FAILED TO QUERY STATUS');
     }
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 dahua.prototype.dayProfile = function () {
   var self = this;
-  request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=1', function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=1', function (error, response, body) {
     if ((!error) && (response.statusCode === 200)) {
       if (body === 'Error') {   // Didnt work, lets try another method for older cameras
-        request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=0', function (error, response, body) { 
+        request(this.BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=0', function (error, response, body) { 
           if ((error) || (response.statusCode !== 200)) {
             self.emit("error", 'FAILED TO CHANGE TO DAY PROFILE');
           }
-        }).auth(USER,PASS,false);
+        }).auth(this.USER,this.PASS,false);
       }
     } else {
       self.emit("error", 'FAILED TO CHANGE TO DAY PROFILE');
     } 
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 dahua.prototype.nightProfile = function () {
   var self = this;
-  request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=2', function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=2', function (error, response, body) {
     if ((!error) && (response.statusCode === 200)) {
       if (body === 'Error') {   // Didnt work, lets try another method for older cameras
-        request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=3', function (error, response, body) { 
+        request(this.BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=3', function (error, response, body) { 
           if ((error) || (response.statusCode !== 200)) {
             self.emit("error", 'FAILED TO CHANGE TO NIGHT PROFILE');
           }
-        }).auth(USER,PASS,false);
+        }).auth(this.USER,this.PASS,false);
       }
     } else {
       self.emit("error", 'FAILED TO CHANGE TO NIGHT PROFILE');
     } 
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 
@@ -283,7 +288,7 @@ dahua.prototype.findFiles = function(query){
  
 dahua.prototype.createFileFind = function () {
   var self = this;
-  request(BASEURI + '/cgi-bin/mediaFileFind.cgi?action=factory.create', function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/mediaFileFind.cgi?action=factory.create', function (error, response, body) {
     if ((error)) {
       self.emit("error", 'ERROR ON CREATE FILE FIND COMMAND');
     }
@@ -291,7 +296,7 @@ dahua.prototype.createFileFind = function () {
     var oid = body.trim().substr(7);
     self.emit("fileFinderCreated",oid);
 
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 
 };
 
@@ -334,7 +339,7 @@ dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,typ
     typesQueryString += '&condition.Types[' + idx + ']=' + el;
   });
 
-  var url = BASEURI + '/cgi-bin/mediaFileFind.cgi?action=findFile&object=' + objectId + '&condition.Channel=' + channel + '&condition.StartTime=' + startTime + '&condition.EndTime=' + endTime + typesQueryString;
+  var url = this.BASEURI + '/cgi-bin/mediaFileFind.cgi?action=findFile&object=' + objectId + '&condition.Channel=' + channel + '&condition.StartTime=' + startTime + '&condition.EndTime=' + endTime + typesQueryString;
   // console.log(url);
   
   request(url, function (error, response, body) {
@@ -352,7 +357,7 @@ dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,typ
         self.emit('startFileFindDone',objectId,body.trim());
       //}
     }
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 
 };
 
@@ -410,7 +415,7 @@ dahua.prototype.nextFileFind = function (objectId,count) {
     return 0;
   }
 
-  request(BASEURI + '/cgi-bin/mediaFileFind.cgi?action=findNextFile&object=' + objectId + '&count=' + count, function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/mediaFileFind.cgi?action=findNextFile&object=' + objectId + '&count=' + count, function (error, response, body) {
     if ((error) || (response.statusCode !== 200)) {
       if (TRACE) console.log('nextFileFind Error:',error);
       self.emit("error", 'FAILED NEXT FILE COMMAND');
@@ -434,7 +439,7 @@ dahua.prototype.nextFileFind = function (objectId,count) {
 
     self.emit('nextFileFindDone',objectId,items);
 
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 
@@ -456,14 +461,14 @@ dahua.prototype.closeFileFind = function (objectId) {
     self.emit("error",'OBJECT ID MISSING');
     return 0;
   }
-  request(BASEURI + '/cgi-bin/mediaFileFind.cgi?action=close&object=' + objectId, function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/mediaFileFind.cgi?action=close&object=' + objectId, function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'ERROR ON CLOSE FILE FIND COMMAND');
     }
     
     self.emit('closeFileFindDone',objectId,body.trim());
 
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 
 };
 
@@ -483,14 +488,14 @@ dahua.prototype.destroyFileFind = function (objectId) {
     self.emit("error",'OBJECT ID MISSING');
     return 0;
   }
-  request(BASEURI + '/cgi-bin/mediaFileFind.cgi?action=destroy&object=' + objectId, function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/mediaFileFind.cgi?action=destroy&object=' + objectId, function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'ERROR ON DESTROY FILE FIND COMMAND');
     }
 
     self.emit('destroyFileFindDone',objectId,body.trim());
 
-  }).auth(USER,PASS,false);
+  }).auth(this.USER,this.PASS,false);
 };
 
 /*=====  End of File Finding  ======*/
@@ -556,12 +561,12 @@ dahua.prototype.saveFile = function (file,filename) {
      // WorkDir: '/mnt/sd',
      // WorkDirSN: '0' };
 
-     filename = this.generateFilename(HOST,file.Channel,file.StartTime,file.EndTime,file.Type);
+     filename = this.generateFilename(this.HOST,file.Channel,file.StartTime,file.EndTime,file.Type);
 
   } 
  
-  progress(request(BASEURI + '/cgi-bin/RPC_Loadfile/' + file.FilePath))
-  .auth(USER,PASS,false)
+  progress(request(this.BASEURI + '/cgi-bin/RPC_Loadfile/' + file.FilePath))
+  .auth(this.USER,this.PASS,false)
   .on('progress', function (state) {
       if(TRACE) {
         console.log('Downloaded', Math.floor(state.percent * 100) + '%','@ '+Math.floor(state.speed / 1000), 'KByte/s' );
@@ -626,10 +631,10 @@ dahua.prototype.getSnapshot = function (options) {
   }
 
   if (!options.filename) {
-    options.filename = this.generateFilename(HOST,options.channel,moment(),'','jpg');
+    options.filename = this.generateFilename(this.HOST,options.channel,moment(),'','jpg');
   }
 
-  request(BASEURI + '/cgi-bin/snapshot.cgi?' + options.channel , function (error, response, body) {
+  request(this.BASEURI + '/cgi-bin/snapshot.cgi?' + options.channel , function (error, response, body) {
     if ((error) || (response.statusCode !== 200)) {
       self.emit("error", 'ERROR ON SNAPSHOT');
     } 
@@ -639,7 +644,7 @@ dahua.prototype.getSnapshot = function (options) {
     self.emit("getSnapshot", {
     'status':'DONE',});
   })
-  .auth(USER,PASS,false).pipe(fs.createWriteStream(path.join(options.path,options.filename)));
+  .auth(this.USER,this.PASS,false).pipe(fs.createWriteStream(path.join(options.path,options.filename)));
   // TBD: file writing error handling
 
 };
