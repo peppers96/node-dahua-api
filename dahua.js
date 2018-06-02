@@ -18,6 +18,9 @@ this.BASEURI   = false;
 this.USER = '';
 this.PASS = '';
 this.HOST = '';
+this.status = {};
+this.cam_brand = 'dahua';
+this.cam_model = '';
 
 var dahua = function(options) {
   
@@ -30,6 +33,17 @@ var dahua = function(options) {
   this.PASS = options.pass;
   this.HOST = options.host;
   this.PORT = options.port;
+  this.cam_brand = options.cam_brand;
+  this.cam_model = options.cam_model;
+  
+  /**
+   * This initializes the default status for each camera. This is deliberately spelled incorrectly to match the values
+   * returned by the camera. Here is an actual example of data returned by the camera:
+   * 
+   * Camera data: status.Focus.FocusPosition=4680.000000,status.Focus.Status=Unknown,status.Iris.IrisValue=11.000000,status.Iris.Status=Idle,status.MoveStatus=Moving,status.PTS=0,status.Postion[0]=33.800000,status.Postion[1]=0.000000,status.Postion[2]=1.000000,status.PresetID=0,status.Sequence=0,status.UTC=0,status.ZoomStatus=Idle,status.ZoomValue=100,
+   * getStatus data returned by the camera will be parsed into an object, then set to the 'status' for the object.
+   */
+  this.status = JSON.parse('{"status.Focus.FocusPosition":"4680.000000","status.Focus.Status":"Unknown","status.Iris.IrisValue":"11.000000","status.Iris.Status":"Idle","status.MoveStatus":"Moving","status.PTS":"0","status.Postion[0]":"33.800000","status.Postion[1]":"0.000000","status.Postion[2]":"1.000000","status.PresetID":"0","status.Sequence":"0","status.UTC":"0","status.ZoomStatus":"Idle","status.ZoomValue":"100"}');
 
   if( options.cameraAlarms === undefined ) {
     options.cameraAlarms = true;
@@ -191,6 +205,23 @@ dahua.prototype.ptzStatus = function () {
     }
   }).auth(this.USER,this.PASS,false);
 };
+
+// function to parse the getStatus() data
+dahua.prototype.parseStatusData = function(camConnection, statusData) {
+  var params = {}, queries, temp, i, l;
+  if (camConnection == null || statusData == null) {
+    return params;
+  }
+  // Split into key/value pairs
+  queries = statusData.split(",");
+  // Convert the array of strings into an object
+  for ( i = 0, l = queries.length; i < l; i++ ) {
+      temp = queries[i].split('=');
+      var testResult = (temp[0].trim() == '');
+      if (!testResult) { params[temp[0]] = temp[1]; };
+  }
+  return params;
+}
 
 dahua.prototype.dayProfile = function () {
   var self = this;
@@ -668,7 +699,6 @@ dahua.prototype.generateFilename = function( device, channel, start, end, filety
   return filename; 
 
 };
-
 
 String.prototype.startsWith = function (str){
   return this.slice(0, str.length) == str;
