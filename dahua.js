@@ -21,6 +21,7 @@ this.HOST = '';
 this.status = {};
 this.cam_brand = 'dahua';
 this.cam_model = '';
+this.queue = [{}];
 
 var dahua = function(options) {
   
@@ -35,6 +36,12 @@ var dahua = function(options) {
   this.PORT = options.port;
   this.cam_brand = options.cam_brand;
   this.cam_model = options.cam_model;
+  this.queue = options.queue;
+  // Set default values if they are missing
+  if (options.queue === undefined) {
+      this.queue = [{}];
+  }
+  
   
   /**
    * This initializes the default status for each camera. This is deliberately spelled incorrectly to match the values
@@ -98,11 +105,6 @@ dahua.prototype.connect = function(options) {
       setTimeout(function() { self.connect(options); }, 30000 );
       handleDahuaEventEnd(self);
     });
-
-    client.on('error', function(err) {
-      handleDahuaEventError(self, err);
-    });
-
 };
 
 function handleDahuaEventData(self, data) {
@@ -212,9 +214,16 @@ dahua.prototype.parseStatusData = function(camConnection, statusData) {
   if (camConnection == null || statusData == null) {
     return params;
   }
-  // Split into key/value pairs
-  queries = statusData.split(",");
-  // Convert the array of strings into an object
+  
+  // The status data may be an array or a string, so convert strings to an array
+  if (statusData.constructor == Array) {
+    queries = statusData;
+  } else if (statusData.constructor == String) {
+    // Split into key/value pairs
+    queries = statusData.split(",");
+  }
+  
+  // Convert the array of strings into an object with a name and a value
   for ( i = 0, l = queries.length; i < l; i++ ) {
       temp = queries[i].split('=');
       var testResult = (temp[0].trim() == '');
