@@ -181,6 +181,7 @@ dahua.prototype.ptzZoom = function (multiple) {
 dahua.prototype.ptzMove = function (direction,action,speed) {
   var self = this;
   var actionAry = ['start','stop'] // make array of correct values for action
+  var directionAry = ['Up','Down','Left','Right','LeftUp','RightUp','LeftDown','RightDown']
   var speed = parseInt(speed);
   if (TRACE) console.log('ptzMove: direction,action,speed ',direction,action,speed);
   if (isNaN(speed)) self.emit("error",'INVALID PTZ SPEED');
@@ -188,8 +189,7 @@ dahua.prototype.ptzMove = function (direction,action,speed) {
     self.emit("error",'INVALID PTZ COMMAND!');
     return 0;
   }
-  if ((direction !== 'Up') || (direction !== 'Down') || (direction !== 'Left') || (direction !== 'Right') ||
-      (direction !== 'LeftUp') || (direction !== 'RightUp') || (direction !== 'LeftDown') || (direction !== 'RightDown')) {
+  if (directionAry.indexOf(direction) == -1) {
     self.emit("error",'INVALID PTZ DIRECTION');
     return 0;
   }
