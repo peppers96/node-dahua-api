@@ -143,6 +143,7 @@ function handleDahuaEventError(self, err) {
 dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
   var self = this;
   if ((!cmd) || (isNaN(arg1)) || (isNaN(arg2)) || (isNaN(arg3)) || (isNaN(arg4))) {
+    if (TRACE) console.log('ptzCommand: '+cmd+' arg1: '+arg1+' arg2: '+arg2+' arg3: '+arg3+' arg4: '+arg4);
     self.emit("error",'INVALID PTZ COMMAND');
     return 0;
   }
@@ -179,9 +180,12 @@ dahua.prototype.ptzZoom = function (multiple) {
 
 dahua.prototype.ptzMove = function (direction,action,speed) {
   var self = this;
+  var actionAry = ['start','stop'] // make array of correct values for action
+  var speed = parseInt(speed);
+  if (TRACE) console.log('ptzMove: direction,action,speed ',direction,action,speed);
   if (isNaN(speed)) self.emit("error",'INVALID PTZ SPEED');
-  if ((action !== 'start') || (action !== 'stop')) {
-    self.emit("error",'INVALID PTZ COMMAND');
+  if (actionAry.indexOf(action) == -1) {
+    self.emit("error",'INVALID PTZ COMMAND!');
     return 0;
   }
   if ((direction !== 'Up') || (direction !== 'Down') || (direction !== 'Left') || (direction !== 'Right') ||
