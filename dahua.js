@@ -714,35 +714,76 @@ dahua.prototype.saveFile = function (file,filename) {
 
 dahua.prototype.getSnapshot = function (options) {
   var self = this;
+  var opts = {};
 
   if(options === undefined) {
     var options = {};
   }
 
-  if ((!options.channel)) {
-    options.channel = 0;
-  }
+  opts.channel = options.channel || 0;
+  opts.path = options.path || '';
+  opts.filename = options.filename || this.generateFilename(this.HOST,opts.channel,moment(),'','jpg');
+  
+  var saveTo = path.join(opts.path,opts.filename);
+  var deletefile = false;
+  
+  var file = fs.createWriteStream(saveTo);
+  
+  file.on('finish',()=> {
+    if(deletefile) {
+      self.emit("getSnapshot", { 'status':"FAIL ECONNRESET or 0 byte recieved." });
+      console.log(moment().format(),'FAIL ECONNRESET or 0 byte recieved. Deleting ',saveTo);
+      fs.unlink(saveTo, (err) => {
+        if (err) throw err;
+      });
+    }
+  });
 
-  if ((!options.path)) {
-    options.path = '';
-  }
+  var ropts = {
+    'uri' : this.BASEURI + '/cgi-bin/snapshot.cgi?' + opts.channel,
+  };
 
-  if (!options.filename) {
-    options.filename = this.generateFilename(this.HOST,options.channel,moment(),'','jpg');
-  }
+  var responseBody = [];
+  var responseHeaders = [];
 
-  request(this.BASEURI + '/cgi-bin/snapshot.cgi?' + options.channel , function (error, response, body) {
-    if ((error) || (response.statusCode !== 200)) {
-      self.emit("error", 'ERROR ON SNAPSHOT');
-    } 
+  request(ropts)
+  .auth(this.USER,this.PASS,false)
+  .on('data', (chunk) => {
+    responseBody.push(chunk); 
+  })
+  .on('response',function (response) {
+    responseHeaders = response.headers;
   })
   .on('end',function(){
-    if(TRACE) console.log('SNAPSHOT SAVED');
-    self.emit("getSnapshot", {
-    'status':'DONE',});
+    responseBody = Buffer.concat(responseBody);
+    responseBodyLength = Buffer.byteLength(responseBody);
+
+    // check if content-length header matches actual recieved length
+    if( responseHeaders['content-length'] != responseBodyLength) {
+      self.emit("getSnapshot", "WARNING content-length missmatch" );
+    }
+    
+    // empty?
+    if(responseHeaders['content-length'] == 0 ) {
+      console.log(moment().format(),'NOT OK content-length 0');
+      deletefile = true;
+      file.end();
+    
+    } else {
+
+      // console.log(moment().format(),'OK content-length',responseBodyLength);
+      deletefile = false;
+      self.emit("getSnapshot", {'status':'DONE',});
+    
+    }
+
   })
-  .auth(this.USER,this.PASS,false).pipe(fs.createWriteStream(path.join(options.path,options.filename)));
-  // TBD: file writing error handling
+  .on('error',function(error){
+    self.emit("error", 'ERROR ON SNAPSHOT - ' + error.code );
+    deletefile = true;
+    file.end();
+  })
+  .pipe(file);
 
 };
 
