@@ -52,11 +52,11 @@ var dahua = function(options) {
    */
   this.status = JSON.parse('{"status.Focus.FocusPosition":"4680.000000","status.Focus.Status":"Unknown","status.Iris.IrisValue":"11.000000","status.Iris.Status":"Idle","status.MoveStatus":"Moving","status.PTS":"0","status.Postion[0]":"33.800000","status.Postion[1]":"0.000000","status.Postion[2]":"1.000000","status.PresetID":"0","status.Sequence":"0","status.UTC":"0","status.ZoomStatus":"Idle","status.ZoomValue":"100"}');
 
-  if( options.cameraAlarms === undefined ) {
+  if ( options.cameraAlarms === undefined ) {
     options.cameraAlarms = true;
   } 
 
-  if( options.cameraAlarms ) { this.client = this.connect(options) };
+  if ( options.cameraAlarms ) { this.client = this.connect(options) };
 
   this.on('error',function(err){
     console.log("Error: " + err);
@@ -139,11 +139,34 @@ function handleDahuaEventError(self, err) {
 }
 
 
-
-dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
+/**
+ * These are the PTZ control commands. It is used to start or stop the PTZ control.
+ * URL syntax: http://<ip>/cgi-bin/ptz.cgi?action=[action]&channel=[ch]&code=[code]&arg1=[argstr]& arg2=[argstr]&arg3=[argstr]&arg4=[argstr]
+ * action is PTZ control command, it can be start or stop.
+ * ch is PTZ channel range is [0 - n-1], code is PTZ operation, and arg1, arg2, arg3, arg4 are the arguments of operation. 
+ * Code and argstr values are listed below in arrays.
+ * RESPONSE: OK or ERROR
+ * @param {*} action ['start','stop']
+ * @param {*} chnl   0 to n-1
+ * @param {*} cmd    Allowed commands are in the function: checkCmdValue(cmd)
+ * @param {*} arg1 
+ * @param {*} arg2 
+ * @param {*} arg3 
+ * @param {*} arg4 
+ */
+dahua.prototype.ptzCommand = function (action,chnl,cmd,arg1,arg2,arg3,arg4) {
   var self = this;
-  if ((!cmd) || (isNaN(arg1)) || (isNaN(arg2)) || (isNaN(arg3)) || (isNaN(arg4))) {
-    if (TRACE) console.log('ptzCommand: '+cmd+' arg1: '+arg1+' arg2: '+arg2+' arg3: '+arg3+' arg4: '+arg4);
+  if (TRACE) console.log('ptzCommand: action: '+action+' chnl: '+chnl+' cmd: '+cmd+' arg1: '+arg1+' arg2: '+arg2+' arg3: '+arg3+' arg4: '+arg4);
+  
+  actionAry = ["start","stop"]
+  chnl = forceInt(chnl)
+  cmd = checkCmdValue(cmd); // verify the cmd passed in is a valid value
+  arg1 = forceInt(arg1);
+  arg2 = forceInt(arg2);
+  if (cmd != "SetPresetName") arg3 = forceInt(arg3); 
+  arg4 = forceInt(arg4);
+  
+  if (((actionAry.indexOf(action)) || chnl || cmd || arg1 || arg2 || arg3 || arg4) == -1) {
     self.emit("error",'INVALID PTZ COMMAND');
     return 0;
   }
@@ -156,7 +179,11 @@ dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
 
 dahua.prototype.ptzPreset = function (preset) {
   var self = this;
-  if (isNaN(preset))  self.emit("error",'INVALID PTZ PRESET');
+  if (isNaN(preset)) {
+    self.emit("error",'INVALID PTZ PRESET');
+    return 0;
+  }
+  preset = parseInt(preset)
   request(this.BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=GotoPreset&arg1=0&arg2=' + preset + '&arg3=0', function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ PRESET');
@@ -166,7 +193,10 @@ dahua.prototype.ptzPreset = function (preset) {
 
 dahua.prototype.ptzZoom = function (multiple) {
   var self = this;
-  if (isNaN(multiple))  self.emit("error",'INVALID PTZ ZOOM');
+  if (isNaN(multiple)) {
+    self.emit("error",'INVALID PTZ ZOOM');
+    return 0;
+  } 
   if (multiple > 0) cmd = 'ZoomTele';
   if (multiple < 0) cmd = 'ZoomWide';
   if (multiple === 0) return 0;
@@ -178,15 +208,38 @@ dahua.prototype.ptzZoom = function (multiple) {
   }).auth(this.USER,this.PASS,false);
 };
 
-dahua.prototype.ptzMove = function (direction,action,speed) {
+/**
+ * These are the MOVE commands subset of the PTZ control commands. This starts or stops the PTZ control movement.
+ * URL syntax: http://<ip>/cgi-bin/ptz.cgi?action=[action]&channel=[ch]&code=[code]&arg1=[argstr]& arg2=[argstr]&arg3=[argstr]&arg4=[argstr]
+ * action is PTZ control command, it can be start or stop.
+ * ch is PTZ channel range is [0 - n-1], code is PTZ operation, and arg1, arg2, arg3, arg4 are the arguments of operation. 
+ * Code and argstr values are listed below in arrays.
+ * RESPONSE: OK or ERROR
+ * 
+ * NOTE: This function only contains the move actions. Other actions should be in the ptzCommand function.
+ * 
+ * @param {*} direction       "is code from the url" 
+ * @param {*} action          "['start','stop']"
+ * @param {*} verticalSpeed   "integer range: [1-8]"
+ * @param {*} horizontalSpeed "integer range: [1-8]"
+ */
+dahua.prototype.ptzMove = function (direction,action,verticalSpeed,horizontalSpeed) {
   var self = this;
-  var actionAry = ['start','stop'] // make array of correct values for action
-  var directionAry = ['Up','Down','Left','Right','LeftUp','RightUp','LeftDown','RightDown']
-  var speed = parseInt(speed);
-  if (TRACE) console.log('ptzMove: direction,action,speed ',direction,action,speed);
-  if (isNaN(speed)) self.emit("error",'INVALID PTZ SPEED');
+  // An array of allowed list of action values.
+  var actionAry = ['start','stop']
+  // This is the allowed list of movements. Some can be destructive. 
+  var directionAry = ["Up", "Down", "Left", "Right", "ZoomWide", "ZoomTele", "FocusNear", "FocusFar", "IrisLarge", "IrisSmall", "GotoPreset", "StartTour", "LeftUp", "RightUp", "LeftDown", "RightDown", "AutoPanOn", "AutoPanOff", "AutoScanOn", "AutoScanOff", "StartPattern", "StopPattern", "Position",  "PositionABS", "PositionReset", "UpTele", "DownTele", "LeftTele", "RightTele", "LeftUpTele", "LeftDownTele", "RightUpTele", "RightDownTele", "UpWide", "DownWide", "LeftWide", "RightWide", "LeftUpWide", "LeftDownWide", "RightUpWide", "RightDownWide", "Continuously", "Relatively"]
+  var verticalSpeed = parseInt(verticalSpeed);
+  var horizontalSpeed = parseInt(horizontalSpeed);
+  if (!isNaN(verticalSpeed) && isNaN(horizontalSpeed)) horizontalSpeed = verticalSpeed
+
+  if (TRACE) console.log('ptzMove: direction,action,verticalSpeed,horizontalSpeed ',direction,action,verticalSpeed,horizontalSpeed);
+  if (isNaN(speed)) {
+    self.emit("error",'INVALID PTZ SPEED');
+    return 0;
+  }
   if (actionAry.indexOf(action) == -1) {
-    self.emit("error",'INVALID PTZ COMMAND!');
+    self.emit("error",'INVALID PTZ COMMAND');
     return 0;
   }
   if (directionAry.indexOf(direction) == -1) {
@@ -716,5 +769,32 @@ dahua.prototype.generateFilename = function( device, channel, start, end, filety
 String.prototype.startsWith = function (str){
   return this.slice(0, str.length) == str;
 };
+
+/**
+ * A function to force a number to an integer, or return -1 if NaN
+ */
+function forceInt(val) {
+  var val = parseInt(val);
+  if (isNaN(val)) {
+    return -1
+  } else {
+    return val
+  }
+}
+
+/**
+ * Check allowed command strings. This function checks a passed `cmd` value against the list of allowed values. 
+ * It returns the string if it is allowed. If the cmd string isn't allowed, this function returns a value of '-1'
+ * @param {*} cmd 
+ */
+function checkCmdValue(cmd) {
+  var allowedCmdCommands = ["Up", "Down", "Left", "Right", "ZoomWide", "ZoomTele", "FocusNear", "FocusFar", "IrisLarge", "IrisSmall", "GotoPreset", "SetPreset", "ClearPreset", "LampWaterClear", "StartTour", "LeftUp", "RightUp", "LeftDown", "RightDown", "AddTour", "DelTour", "ClearTour", "AutoPanOn", "AutoPanOff", "SetLeftLimit", "SetRightLimit", "AutoScanOn", "AutoScanOff", "SetPatternBegin", "SetPatternEnd", "StartPattern", "StopPattern", "ClearPattern", "AlarmSearch", "Position", "AuxOn", "AuxOff", "Menu", "Exit", "Enter", "Esc", "MenuUp", "MenuDown", "MenuLeft", "MenuRight", "Reset", "SetPresetName", "AlarmPtz", "LightController", "PositionABS", "PositionReset", "UpTele", "DownTele", "LeftTele", "RightTele", "LeftUpTele", "LeftDownTele", "RightUpTele", "RightDownTele", "UpWide", "DownWide", "LeftWide", "RightWide", "LeftUpWide", "LeftDownWide", "RightUpWide", "RightDownWide", "Continuously", "Relatively"]
+  if (allowedCmdCommands.indexOf(cmd) != -1) {
+    return cmd
+  } else {
+    return -1
+  }
+}
+
 
 exports.dahua = dahua;
