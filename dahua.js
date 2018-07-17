@@ -52,11 +52,11 @@ var dahua = function(options) {
    */
   this.status = JSON.parse('{"status.Focus.FocusPosition":"4680.000000","status.Focus.Status":"Unknown","status.Iris.IrisValue":"11.000000","status.Iris.Status":"Idle","status.MoveStatus":"Moving","status.PTS":"0","status.Postion[0]":"33.800000","status.Postion[1]":"0.000000","status.Postion[2]":"1.000000","status.PresetID":"0","status.Sequence":"0","status.UTC":"0","status.ZoomStatus":"Idle","status.ZoomValue":"100"}');
 
-  if ( options.cameraAlarms === undefined ) {
-    options.cameraAlarms = true;
+  if ( options.active === undefined ) {
+    options.active = true;
   } 
 
-  if ( options.cameraAlarms ) { this.client = this.connect(options) };
+  if ( options.active ) { this.client = this.connect(options) };
 
   this.on('error',function(err){
     console.log("Error: " + err);
